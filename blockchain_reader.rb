@@ -5,6 +5,7 @@ require 'digest'
 # Class to read in a single .dat file or all .dat files from the Bitcoin blockchain
 class BlockchainReader
   TYPES = %w[
+    P2PK
     P2SH
     V0_P2WSH
   ]
@@ -52,7 +53,10 @@ class BlockchainReader
       puts 'Starting new transaction...'
       puts "Approximate data: #{unparsed_transactions[transaction_pointer...(transaction_pointer + 1000)]}"
       _version = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
-      transaction_pointer += 12 # there is some unknown data '0001', so skip it
+      transaction_pointer += 8 # there is some unknown data '0001', so skip it
+      trash = unparsed_transactions[transaction_pointer...(transaction_pointer + 4)]
+      transaction_pointer += 4 if trash == '0001' || trash == '0000'
+
       input_counts = parse_varint(unparsed_transactions[transaction_pointer...(transaction_pointer + 18)])
       input_count = hex_to_dec(input_counts[1])
       puts "\tNumber of inputs: #{input_count}"
