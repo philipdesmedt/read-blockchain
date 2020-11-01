@@ -50,7 +50,7 @@ class BlockchainReader
     transaction_pointer = 0
     while unparsed_transactions[transaction_pointer]
       puts 'Starting new transaction...'
-      puts "Approximate data: #{block[transaction_pointer...(transaction_pointer + 1000)]}"
+      puts "Approximate data: #{unparsed_transactions[transaction_pointer...(transaction_pointer + 1000)]}"
       _version = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
       transaction_pointer += 12 # there is some unknown data '0001', so skip it
       input_counts = parse_varint(unparsed_transactions[transaction_pointer...(transaction_pointer + 18)])
@@ -59,6 +59,7 @@ class BlockchainReader
       transaction_pointer += input_counts[0].length
       coinbase_transaction = false
       vout = -99
+      extract_witness_data = false
 
       input_count.times do |i|
         tx_id = unparsed_transactions[transaction_pointer...(transaction_pointer + 64)]
@@ -78,6 +79,8 @@ class BlockchainReader
         script_sig = unparsed_transactions[transaction_pointer...(transaction_pointer + size)]
         puts "\t\tscripSig: #{script_sig}"
         transaction_pointer += size
+        # OP_PUSHBYTES_22 type == 'P2SH' && hex_to_dec(swap_alternative(vout)) == i
+        extract_witness_data = true if script_sig[0...2] == '16'
 
         sequence = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
         puts "\t\tSequence: #{sequence}"
@@ -105,42 +108,30 @@ class BlockchainReader
         puts "\n"
 
         type = determine_output_type(script_pub_key)
-        if type == 'V0_P2WSH'
-          # Do some fuckery. TODO: check if always 3 parts?
-          puts "\tThis is a SegWit V0 transaction. Extracting witness data..."
-          _version = unparsed_transactions[transaction_pointer...(transaction_pointer + 4)]
-          transaction_pointer += 4
-          puts "\t\tWitness"
-
-          part_one_size = unparsed_transactions[transaction_pointer...(transaction_pointer + 2)]
-          transaction_pointer += 2
-          size = hex_to_dec(part_one_size) * 2
-          witness_part_one = unparsed_transactions[transaction_pointer...(transaction_pointer + size)]
-          transaction_pointer += size
-          puts "\t\t#{witness_part_one}\n"
-
-          part_two_size = unparsed_transactions[transaction_pointer...(transaction_pointer + 2)]
-          transaction_pointer += 2
-          size = hex_to_dec(part_two_size) * 2
-          witness_part_two = unparsed_transactions[transaction_pointer...(transaction_pointer + size)]
-          transaction_pointer += size
-          puts "\t\t#{witness_part_two}\n"
-
-          part_three_size = unparsed_transactions[transaction_pointer...(transaction_pointer + 2)]
-          transaction_pointer += 2
-          size = hex_to_dec(part_three_size) * 2
-          witness_part_three = unparsed_transactions[transaction_pointer...(transaction_pointer + size)]
-          transaction_pointer += size
-          puts "\t\t#{witness_part_three}\n"
-        elsif type == 'P2SH' && hex_to_dec(swap_alternative(vout)) == i + 1
-          puts "\tThis is a P2SH transaction. Extracting witness data..."
-        end
+        extract_witness_data = true if type == 'V0_P2WSH'
       end
 
       if coinbase_transaction
         witness_data = unparsed_transactions[transaction_pointer...(transaction_pointer + 64)]
         puts "\tThis is a coinbase transaction with witness data #{witness_data}"
         transaction_pointer += 64
+      end
+
+      if extract_witness_data
+        puts "\tThis is a P2SH or SegWit V0 transaction. Extracting witness data..."
+        puts "\t\tWitness"
+        input_count.times do |_x|
+          no_of_parts = hex_to_dec(unparsed_transactions[transaction_pointer...(transaction_pointer + 2)])
+          transaction_pointer += 2
+
+          no_of_parts.times do |_x|
+            length = hex_to_dec(unparsed_transactions[transaction_pointer...(transaction_pointer + 2)]) * 2
+            transaction_pointer += 2
+            data = unparsed_transactions[transaction_pointer...(transaction_pointer + length)]
+            transaction_pointer += length
+            puts "\t\t#{data}"
+          end
+        end
       end
 
       locktime = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
