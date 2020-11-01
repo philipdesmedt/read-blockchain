@@ -4,6 +4,10 @@ require 'digest'
 
 # Class to read in a single .dat file or all .dat files from the Bitcoin blockchain
 class BlockchainReader
+  TYPES = %w[
+    P2SH
+    V0_P2WSH
+  ]
   attr_reader :directory, :files, :block, :blocks
 
   def initialize(directory: '/Users/philip/Library/Application Support/Bitcoin/blocks')
@@ -45,17 +49,22 @@ class BlockchainReader
     unparsed_transactions = block[(160 + tx_array[0].length)..-1]
     transaction_pointer = 0
     while unparsed_transactions[transaction_pointer]
+      puts 'Starting new transaction...'
+      puts "Approximate data: #{block[transaction_pointer...(transaction_pointer + 1000)]}"
       _version = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
       transaction_pointer += 12 # there is some unknown data '0001', so skip it
       input_counts = parse_varint(unparsed_transactions[transaction_pointer...(transaction_pointer + 18)])
       input_count = hex_to_dec(input_counts[1])
       puts "\tNumber of inputs: #{input_count}"
       transaction_pointer += input_counts[0].length
+      coinbase_transaction = false
+      vout = -99
 
-      input_count.times do |_x|
+      input_count.times do |i|
         tx_id = unparsed_transactions[transaction_pointer...(transaction_pointer + 64)]
-        puts "\t\tTransaction ID: #{tx_id}"
+        puts "\t\tTransaction ID: #{tx_id} (#{swap_alternative(tx_id)})"
         transaction_pointer += 64
+        coinbase_transaction = (tx_id == '0' * 64) if i.zero?
 
         vout = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
         puts "\t\tSelected VOut: #{vout}"
@@ -80,7 +89,7 @@ class BlockchainReader
       puts "\tNumber of outputs: #{output_count}"
       transaction_pointer += output_counts[0].length
 
-      output_count.times do |_x|
+      output_count.times do |i|
         amount = unparsed_transactions[transaction_pointer...(transaction_pointer + 16)]
         puts "\t\tAmount: #{swap_alternative(amount).to_i(16)} satoshi"
         transaction_pointer += 16
@@ -94,13 +103,49 @@ class BlockchainReader
         puts "\t\tscriptPubKey: #{script_pub_key}"
         transaction_pointer += size
         puts "\n"
+
+        type = determine_output_type(script_pub_key)
+        if type == 'V0_P2WSH'
+          # Do some fuckery. TODO: check if always 3 parts?
+          puts "\tThis is a SegWit V0 transaction. Extracting witness data..."
+          _version = unparsed_transactions[transaction_pointer...(transaction_pointer + 4)]
+          transaction_pointer += 4
+          puts "\t\tWitness"
+
+          part_one_size = unparsed_transactions[transaction_pointer...(transaction_pointer + 2)]
+          transaction_pointer += 2
+          size = hex_to_dec(part_one_size) * 2
+          witness_part_one = unparsed_transactions[transaction_pointer...(transaction_pointer + size)]
+          transaction_pointer += size
+          puts "\t\t#{witness_part_one}\n"
+
+          part_two_size = unparsed_transactions[transaction_pointer...(transaction_pointer + 2)]
+          transaction_pointer += 2
+          size = hex_to_dec(part_two_size) * 2
+          witness_part_two = unparsed_transactions[transaction_pointer...(transaction_pointer + size)]
+          transaction_pointer += size
+          puts "\t\t#{witness_part_two}\n"
+
+          part_three_size = unparsed_transactions[transaction_pointer...(transaction_pointer + 2)]
+          transaction_pointer += 2
+          size = hex_to_dec(part_three_size) * 2
+          witness_part_three = unparsed_transactions[transaction_pointer...(transaction_pointer + size)]
+          transaction_pointer += size
+          puts "\t\t#{witness_part_three}\n"
+        elsif type == 'P2SH' && hex_to_dec(swap_alternative(vout)) == i + 1
+          puts "\tThis is a P2SH transaction. Extracting witness data..."
+        end
+      end
+
+      if coinbase_transaction
+        witness_data = unparsed_transactions[transaction_pointer...(transaction_pointer + 64)]
+        puts "\tThis is a coinbase transaction with witness data #{witness_data}"
+        transaction_pointer += 64
       end
 
       locktime = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
-      puts "\tLocktime: #{locktime}"
-
-      transaction_pointer += 10_000_000
-      false
+      puts "\tLocktime: #{locktime}\n\n"
+      transaction_pointer += 8
     end
 
     false
@@ -118,6 +163,17 @@ class BlockchainReader
     nonce = block[152...160]
 
     "#{version}#{previous_block}#{merkle_root}#{timestamp}#{bits}#{nonce}"
+  end
+
+  def determine_output_type(script_pub_key)
+    prefix = script_pub_key[0...2]
+    if prefix == '00'
+      'V0_P2WSH'
+    elsif prefix == 'a9'
+      'P2SH'
+    elsif prefix == '76'
+      'P2PKH'
+    end
   end
 
   # Calculates the full variable integer and returns it
