@@ -1,0 +1,23 @@
+
+Version: 01000000
+Segwit: 0001
+
+Input count: 01
+Prev TX Hash: ae5792338d66bda0af49d71ab83db3c312d23600ef8065333c293705da020e8a
+Prev TX index: 01000000
+scriptSig: 00
+sequence: ffffffff
+
+Output count: 01
+Output value: cfd3040000000000 (0.00316367 btc)
+scriptPubKey size: 19 HEX (16 + 9 = 25 bytes, 50 characters)
+scriptPubKey: 76a91480fc31f5ccacde7cd2086509665c2871041a1bfe88ac
+
+Witness program:
+  parts: 02
+  length 1: 48 HEX (4*16 + 8 = 72 bytes, 144 characters)
+  witness data 1: 3045022100991af22f470dd638b66a72241cac11e516fef9bc489f361f3dea04f50fa43b1d0220745866a05de48285d0de61e229b1f3a6787bb1f758db4a75010139dec6944bf501
+  length 2: 21 HEX (2*16 + 1 = 33 bytes, 66 characters)
+  02e64d450f6637e2ea1d095b1a710001af3e991245f90e82b4587a171373c87b9d
+
+Locktime: 00000000

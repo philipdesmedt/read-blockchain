@@ -54,8 +54,8 @@ class BlockchainReader
       puts "Approximate data: #{unparsed_transactions[transaction_pointer...(transaction_pointer + 1000)]}"
       _version = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
       transaction_pointer += 8 # there is some unknown data '0001', so skip it
-      trash = unparsed_transactions[transaction_pointer...(transaction_pointer + 4)]
-      transaction_pointer += 4 if trash == '0001' || trash == '0000'
+      witness_program = unparsed_transactions[transaction_pointer...(transaction_pointer + 4)]
+      transaction_pointer += 4 if %w[0001 0000].include?(witness_program)
 
       input_counts = parse_varint(unparsed_transactions[transaction_pointer...(transaction_pointer + 18)])
       input_count = hex_to_dec(input_counts[1])
@@ -81,10 +81,10 @@ class BlockchainReader
 
         size = hex_to_dec(parsed_scriptsig_size[1]) * 2
         script_sig = unparsed_transactions[transaction_pointer...(transaction_pointer + size)]
-        puts "\t\tscripSig: #{script_sig}"
+        puts "\t\tscriptSig: #{script_sig}"
         transaction_pointer += size
         # OP_PUSHBYTES_22 type == 'P2SH' && hex_to_dec(swap_alternative(vout)) == i
-        extract_witness_data = true if script_sig[0...2] == '16'
+        extract_witness_data = true if script_sig[0...2] == '16' || script_sig.empty?
 
         sequence = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
         puts "\t\tSequence: #{sequence}"
