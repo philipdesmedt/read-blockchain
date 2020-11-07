@@ -4,11 +4,6 @@ require 'digest'
 
 # Class to read in a single .dat file or all .dat files from the Bitcoin blockchain
 class BlockchainReader
-  TYPES = %w[
-    P2PK
-    P2SH
-    V0_P2WSH
-  ]
   attr_reader :directory, :files, :block, :blocks
 
   def initialize(directory: '/Users/philip/Library/Application Support/Bitcoin/blocks')
@@ -28,7 +23,11 @@ class BlockchainReader
     message_header = bin_to_hex(file.read(8))
     return if message_header.nil?
 
-    read_block(file, message_header)
+    while !message_header.nil?
+      transaction_pointer = read_block(file, message_header)
+      puts "Next block at #{transaction_pointer}"
+      message_header = bin_to_hex(file.read(8))
+    end
   end
 
   def read_block(file, message_header)
@@ -50,6 +49,8 @@ class BlockchainReader
     unparsed_transactions = block[(160 + tx_array[0].length)..-1]
     transaction_pointer = 0
     tx_index = 0
+    # https://learnmeabitcoin.com/technical/transaction-data
+    # https://developer.bitcoin.org/reference/transactions.html
     while unparsed_transactions[transaction_pointer]
       tx_index += 1
       puts "Starting transaction #{tx_index}..."
@@ -69,7 +70,7 @@ class BlockchainReader
 
       input_count.times do |i|
         tx_id = unparsed_transactions[transaction_pointer...(transaction_pointer + 64)]
-        puts "\t\tTransaction ID: #{tx_id} (#{swap_alternative(tx_id)})"
+        puts "\t\tPrevious Transaction Hash: #{tx_id} (#{swap_alternative(tx_id)})"
         transaction_pointer += 64
         coinbase_transaction = (tx_id == '0' * 64) if i.zero?
 
@@ -112,9 +113,6 @@ class BlockchainReader
         puts "\t\tscriptPubKey: #{script_pub_key}"
         transaction_pointer += size
         puts "\n"
-
-        # type = determine_output_type(script_pub_key)
-        # extract_witness_data = true if type == 'V0_P2WSH'
       end
 
       if coinbase_transaction
@@ -145,7 +143,7 @@ class BlockchainReader
       transaction_pointer += 8
     end
 
-    false
+    transaction_pointer
   end
 
   private
@@ -160,17 +158,6 @@ class BlockchainReader
     nonce = block[152...160]
 
     "#{version}#{previous_block}#{merkle_root}#{timestamp}#{bits}#{nonce}"
-  end
-
-  def determine_output_type(script_pub_key)
-    prefix = script_pub_key[0...2]
-    if prefix == '00'
-      'V0_P2WSH'
-    elsif prefix == 'a9'
-      'P2SH'
-    elsif prefix == '76'
-      'P2PKH'
-    end
   end
 
   # Calculates the full variable integer and returns it
