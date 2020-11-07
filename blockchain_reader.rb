@@ -4,11 +4,12 @@ require 'digest'
 
 # Class to read in a single .dat file or all .dat files from the Bitcoin blockchain
 class BlockchainReader
-  attr_reader :directory, :files, :block, :blocks
+  attr_reader :directory, :files, :block_hashes
 
   def initialize(directory: '/Users/philip/Library/Application Support/Bitcoin/blocks')
     @directory = directory
     @files = Dir.glob("#{directory}/blk*.dat")
+    @block_hashes = []
   end
 
   def read_all
@@ -37,10 +38,11 @@ class BlockchainReader
     _magic_bytes = message_header[0...8]
     block_size = hex_to_dec(swap_alternative(message_header[8...16]))
 
-    @block = bin_to_hex(file.read(block_size))
+    block = bin_to_hex(file.read(block_size))
     block_header = calculate_block_header(block)
     block_hash = swap_alternative(bin_to_hex(Digest::SHA256.digest(Digest::SHA256.digest([block_header].pack('H*')))))
     puts "Found block with hash: #{block_hash} [#{block_size} bytes]"
+    block_hashes << block_hash
 
     transaction_data = block[160..-1]
     tx_array = parse_varint(transaction_data)
