@@ -20,13 +20,15 @@ class BlockchainReader
   def read_file(filename)
     file = File.open(filename, 'rb')
     # https://learnmeabitcoin.com/technical/blkdat
-    message_header = bin_to_hex(file.read(8))
-    return if message_header.nil?
+    raw_header = file.read(8)
 
-    while !message_header.nil?
+    loop do
+      break if raw_header.nil?
+
+      message_header = bin_to_hex(raw_header)
       transaction_pointer = read_block(file, message_header)
       puts "Next block at #{transaction_pointer}"
-      message_header = bin_to_hex(file.read(8))
+      raw_header = file.read(8)
     end
   end
 
