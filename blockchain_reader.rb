@@ -9,7 +9,7 @@ class BlockchainReader
   def initialize(directory: '/Users/philip/Library/Application Support/Bitcoin/blocks')
     @directory = directory
     @files = Dir.glob("#{directory}/blk*.dat")
-    @block_hashes = []
+    @block_hashes = {}
   end
 
   def read_all
@@ -42,7 +42,7 @@ class BlockchainReader
     block_header = calculate_block_header(block)
     block_hash = swap_alternative(bin_to_hex(Digest::SHA256.digest(Digest::SHA256.digest([block_header].pack('H*')))))
     puts "Found block with hash: #{block_hash} [#{block_size} bytes]"
-    block_hashes << block_hash
+    block_hashes[block_hash] = []
 
     transaction_data = block[160..-1]
     tx_array = parse_varint(transaction_data)
