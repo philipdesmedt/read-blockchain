@@ -4,12 +4,12 @@ require 'digest'
 
 # Class to read in a single .dat file or all .dat files from the Bitcoin blockchain
 class BlockchainReader
-  attr_reader :directory, :files, :block_hashes
+  attr_reader :directory, :files, :blocks
 
   def initialize(directory: '/Users/philip/Library/Application Support/Bitcoin/blocks')
     @directory = directory
     @files = Dir.glob("#{directory}/blk*.dat")
-    @block_hashes = {}
+    @blocks = {}
   end
 
   def read_all
@@ -42,7 +42,7 @@ class BlockchainReader
     block_header = calculate_block_header(block)
     block_hash = swap_alternative(bin_to_hex(Digest::SHA256.digest(Digest::SHA256.digest([block_header].pack('H*')))))
     puts "Found block with hash: #{block_hash} [#{block_size} bytes]"
-    block_hashes[block_hash] = []
+    @blocks[block_hash] = []
 
     transaction_data = block[160..-1]
     tx_array = parse_varint(transaction_data)
@@ -56,6 +56,8 @@ class BlockchainReader
     # https://learnmeabitcoin.com/technical/transaction-data
     # https://developer.bitcoin.org/reference/transactions.html
     while unparsed_transactions[transaction_pointer]
+      inputs = []
+      outputs = []
       tx_index += 1
       puts "Starting transaction #{tx_index} of block with hash #{block_hash}"
       puts "Approximate data: #{unparsed_transactions[transaction_pointer...(transaction_pointer + 10000)]}"
@@ -96,6 +98,13 @@ class BlockchainReader
         sequence = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
         puts "\t\tSequence: #{sequence}"
         transaction_pointer += 8
+
+        inputs << {
+          previous_tx_hash: tx_id,
+          selected_vout: vout,
+          script_sig: script_sig,
+          sequence: sequence
+        }
       end
 
       output_counts = parse_varint(unparsed_transactions[transaction_pointer...(transaction_pointer + 18)])
@@ -117,6 +126,11 @@ class BlockchainReader
         puts "\t\tscriptPubKey: #{script_pub_key}"
         transaction_pointer += size
         puts "\n"
+
+        outputs << {
+          amount: swap_alternative(amount).to_i(16),
+          script_pub_key: script_pub_key
+        }
       end
 
       if coinbase_transaction
@@ -154,6 +168,11 @@ class BlockchainReader
       locktime = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
       puts "\tLocktime: #{locktime}\n\n"
       transaction_pointer += 8
+
+      blocks[block_hash] << {
+        inputs: inputs,
+        outputs: outputs
+      }
     end
 
     transaction_pointer
