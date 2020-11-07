@@ -49,8 +49,10 @@ class BlockchainReader
 
     unparsed_transactions = block[(160 + tx_array[0].length)..-1]
     transaction_pointer = 0
+    tx_index = 0
     while unparsed_transactions[transaction_pointer]
-      puts 'Starting new transaction...'
+      tx_index += 1
+      puts "Starting transaction #{tx_index}..."
       puts "Approximate data: #{unparsed_transactions[transaction_pointer...(transaction_pointer + 1000)]}"
       _version = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
       transaction_pointer += 8 # there is some unknown data '0001', so skip it
@@ -84,7 +86,7 @@ class BlockchainReader
         puts "\t\tscriptSig: #{script_sig}"
         transaction_pointer += size
         # OP_PUSHBYTES_22 type == 'P2SH' && hex_to_dec(swap_alternative(vout)) == i
-        extract_witness_data = true if script_sig[0...2] == '16' || script_sig.empty?
+        extract_witness_data = true if %w[16 22].include?(script_sig[0...2]) || script_sig.empty?
 
         sequence = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
         puts "\t\tSequence: #{sequence}"
@@ -111,8 +113,8 @@ class BlockchainReader
         transaction_pointer += size
         puts "\n"
 
-        type = determine_output_type(script_pub_key)
-        extract_witness_data = true if type == 'V0_P2WSH'
+        # type = determine_output_type(script_pub_key)
+        # extract_witness_data = true if type == 'V0_P2WSH'
       end
 
       if coinbase_transaction
@@ -177,13 +179,13 @@ class BlockchainReader
     prefix = input[0...2]
 
     if prefix == 'fd'
-      value = input[2...6]
+      value = swap_alternative(input[2...6])
       full = "#{prefix}#{value}"
     elsif prefix == 'fe'
-      value = input[2...10]
+      value = swap_alternative(input[2...10])
       full = "#{prefix}#{value}"
     elsif prefix == 'ff'
-      value = input[2...18]
+      value = swap_alternative(input[2...18])
       full = "#{prefix}#{value}"
     else
       value = prefix
