@@ -53,8 +53,8 @@ class BlockchainReader
     # https://developer.bitcoin.org/reference/transactions.html
     while unparsed_transactions[transaction_pointer]
       tx_index += 1
-      puts "Starting transaction #{tx_index}..."
-      puts "Approximate data: #{unparsed_transactions[transaction_pointer...(transaction_pointer + 1000)]}"
+      puts "Starting transaction #{tx_index} of block with hash #{block_hash}"
+      puts "Approximate data: #{unparsed_transactions[transaction_pointer...(transaction_pointer + 10000)]}"
       _version = unparsed_transactions[transaction_pointer...(transaction_pointer + 8)]
       transaction_pointer += 8 # there is some unknown data '0001', so skip it
       witness_program = unparsed_transactions[transaction_pointer...(transaction_pointer + 4)]
@@ -118,8 +118,9 @@ class BlockchainReader
       if coinbase_transaction
         no_of_parts = hex_to_dec(unparsed_transactions[transaction_pointer...(transaction_pointer + 2)])
         transaction_pointer += 2
-        length = hex_to_dec(unparsed_transactions[transaction_pointer...(transaction_pointer + 2)]) * 2
-        transaction_pointer += 2
+        parsed_length = parse_varint(unparsed_transactions[transaction_pointer...(transaction_pointer + 18)])
+        length = hex_to_dec(parsed_length[1]) * 2
+        transaction_pointer += parsed_length[0].length
 
         witness_data = unparsed_transactions[transaction_pointer...(transaction_pointer + length)]
         puts "\tThis is a coinbase transaction with witness data #{witness_data}"
@@ -135,8 +136,10 @@ class BlockchainReader
           puts "Extracting witness data for input count #{i + 1} which has #{no_of_parts} parts"
 
           no_of_parts.times do |_x|
-            length = hex_to_dec(unparsed_transactions[transaction_pointer...(transaction_pointer + 2)]) * 2
-            transaction_pointer += 2
+            parsed_length = parse_varint(unparsed_transactions[transaction_pointer...(transaction_pointer + 18)])
+            length = hex_to_dec(parsed_length[1]) * 2
+            transaction_pointer += parsed_length[0].length
+
             data = unparsed_transactions[transaction_pointer...(transaction_pointer + length)]
             transaction_pointer += length
             puts "\t\t#{data}"
