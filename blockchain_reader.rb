@@ -99,7 +99,7 @@ class BlockchainReader
       puts "\tNumber of outputs: #{output_count}"
       transaction_pointer += output_counts[0].length
 
-      output_count.times do |i|
+      output_count.times do
         amount = unparsed_transactions[transaction_pointer...(transaction_pointer + 16)]
         puts "\t\tAmount: #{swap_alternative(amount).to_i(16)} satoshi"
         transaction_pointer += 16
@@ -116,17 +116,23 @@ class BlockchainReader
       end
 
       if coinbase_transaction
-        witness_data = unparsed_transactions[transaction_pointer...(transaction_pointer + 64)]
+        no_of_parts = hex_to_dec(unparsed_transactions[transaction_pointer...(transaction_pointer + 2)])
+        transaction_pointer += 2
+        length = hex_to_dec(unparsed_transactions[transaction_pointer...(transaction_pointer + 2)]) * 2
+        transaction_pointer += 2
+
+        witness_data = unparsed_transactions[transaction_pointer...(transaction_pointer + length)]
         puts "\tThis is a coinbase transaction with witness data #{witness_data}"
-        transaction_pointer += 64
+        transaction_pointer += length
       end
 
       if extract_witness_data
         puts "\tThis is a P2SH or SegWit V0 transaction. Extracting witness data..."
         puts "\t\tWitness"
-        input_count.times do |_x|
+        input_count.times do |i|
           no_of_parts = hex_to_dec(unparsed_transactions[transaction_pointer...(transaction_pointer + 2)])
           transaction_pointer += 2
+          puts "Extracting witness data for input count #{i + 1} which has #{no_of_parts} parts"
 
           no_of_parts.times do |_x|
             length = hex_to_dec(unparsed_transactions[transaction_pointer...(transaction_pointer + 2)]) * 2
